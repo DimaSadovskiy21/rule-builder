@@ -221,7 +221,7 @@ const RuleBuilder = () => {
         {!groups.length ? (
           <div className="flex flex-col items-center gap-6">
             <img
-              src="public/norules_image.webp"
+              src="norules_image.webp"
               alt="no rules"
               className="w-[40%]"
             />
