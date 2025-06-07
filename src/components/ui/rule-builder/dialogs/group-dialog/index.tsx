@@ -26,7 +26,6 @@ import {
 
 type Props = {
   parentId?: string;
-  parentIndex?: number;
   data?: TGroup;
   index?: number;
   disabled?: boolean;
@@ -37,7 +36,6 @@ type Props = {
 const GroupDialog: FC<Props> = (props) => {
   const {
     parentId,
-    parentIndex,
     data,
     index,
     disabled,
@@ -87,7 +85,6 @@ const GroupDialog: FC<Props> = (props) => {
         handleCreateOrEditGroups({
           action: ACTION_TYPE.EDIT,
           group: updatedGroup,
-          index,
         });
 
         toast.success("Group was updated successfully");
@@ -97,7 +94,7 @@ const GroupDialog: FC<Props> = (props) => {
         return;
       }
 
-      if (parentId && !groupId && typeof parentIndex === "number") {
+      if (parentId && !groupId) {
         const newSubgroup: TGroup = {
           groupId: uuidv4(),
           title,
@@ -109,7 +106,6 @@ const GroupDialog: FC<Props> = (props) => {
           action: ACTION_TYPE.SUB_CREATE,
           group: newSubgroup,
           parentId,
-          parentIndex,
         });
 
         toast.success("Subgroup was created successfully");
@@ -126,7 +122,6 @@ const GroupDialog: FC<Props> = (props) => {
       parentId,
       data,
       index,
-      parentIndex,
       handleClose,
       handleCreateOrEditGroups,
       handleParentOpen,
@@ -140,7 +135,10 @@ const GroupDialog: FC<Props> = (props) => {
         size="sm"
         onClick={handleOpen}
         disabled={disabled}
-        className={cn("border-none shadow-none", !parentId && "w-full justify-start")}
+        className={cn(
+          "border-none shadow-none",
+          !parentId && "w-full justify-start"
+        )}
       >
         {data ? (
           <>

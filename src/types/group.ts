@@ -22,7 +22,7 @@ export type TChildType = (typeof CHILD_TYPE)[keyof typeof CHILD_TYPE];
 
 export type TChild = {
   type: TChildType;
-  index: number;
+  id: string;
 };
 
 export type TGroup = {
@@ -34,11 +34,9 @@ export type TGroup = {
 };
 
 export type TGroupParams =
-  | { action: "CREATE"; group: TGroup }
-  | { action: "EDIT"; group: TGroup; index: number }
+  | { action: "CREATE" | "EDIT"; group: TGroup }
   | {
       action: "SUB_CREATE";
       group: TGroup;
       parentId: string;
-      parentIndex: number;
     };

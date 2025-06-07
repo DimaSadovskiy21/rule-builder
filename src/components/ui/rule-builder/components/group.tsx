@@ -42,8 +42,6 @@ import { type TFilterParams } from "@/types/filter";
 type Props = {
   group: TGroup;
   index: number;
-  parentIndex?: number;
-  childPosition?: number;
   displayIndex: string;
   siblingCount: number;
   childrenElements?: (isBlocked: boolean, isPaused: boolean) => ReactNode[];
@@ -52,7 +50,7 @@ type Props = {
   isParentPaused?: boolean;
   handleCreateOrEditGroups: (params: TGroupParams) => void;
   handleCreateOrEditFilters: (params: TFilterParams) => void;
-  moveGroup: (fromIndex: number, toIndex: number, parentIndex?: number) => void;
+  moveGroup: (fromIndex: number, toIndex: number, parentId?: string) => void;
 };
 
 const ACCORDION_NAME = "name";
@@ -71,8 +69,6 @@ const Group: FC<Props> = (props) => {
     handleCreateOrEditGroups,
     handleCreateOrEditFilters,
     moveGroup,
-    parentIndex,
-    childPosition
   } = props;
   const { groupId, logic, title, children, parentId } = group;
 
@@ -102,7 +98,6 @@ const Group: FC<Props> = (props) => {
     handleCreateOrEditGroups({
       action: ACTION_TYPE.EDIT,
       group: updattedGroup,
-      index,
     });
   };
 
@@ -114,8 +109,8 @@ const Group: FC<Props> = (props) => {
     if (!groupRef.current) return;
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("dragged-index", typeof childPosition === 'number' ? childPosition.toString() : index.toString());
-    event.dataTransfer.setData("dragged-parent-id", parentId || PARENT_NAME)
+    event.dataTransfer.setData("dragged-index", index.toString());
+    event.dataTransfer.setData("dragged-parent-id", parentId || PARENT_NAME);
 
     const clone = groupRef.current.cloneNode(true) as HTMLElement;
     clone.style.position = "absolute";
@@ -165,14 +160,13 @@ const Group: FC<Props> = (props) => {
     const draggedIndex = event.dataTransfer.getData("dragged-index");
     const draggedParentId = event.dataTransfer.getData("dragged-parent-id");
 
-  
     if (draggedParentId !== (parentId || PARENT_NAME)) {
       toast.error("You can only reorder elements within the same parent");
 
-      return
+      return;
     }
 
-    moveGroup(Number(draggedIndex), typeof childPosition === 'number' ? childPosition : index, parentIndex);
+    moveGroup(Number(draggedIndex), index, parentId);
   };
 
   const finalIsBlocked = isBlocked || !!isParentBlocked;
@@ -195,7 +189,6 @@ const Group: FC<Props> = (props) => {
           draggable
           onDragStart={handleDragStart}
           disabled={siblingCount < 2 || isParentBlocked}
-          
         >
           <GripVertical />
         </Button>
@@ -216,7 +209,7 @@ const Group: FC<Props> = (props) => {
             logic === LOGIC_TYPE.AND
               ? "border border-blue-500 bg-blue-50"
               : "border border-green-500 bg-green-50",
-              parentId && "mr-1",
+            parentId && "mr-1",
             finalIsPaused && "bg-secondary italic border border-border",
             finalIsBlocked && "bg-gray-100",
             isDragOver && "ring-2 ring-ring",
@@ -311,14 +304,12 @@ const Group: FC<Props> = (props) => {
           <div className="flex gap-2 flex-wrap mt-4">
             <GroupDialog
               parentId={group.groupId}
-              parentIndex={index}
               handleCreateOrEditGroups={handleCreateOrEditGroups}
               handleParentOpen={onValueChange}
               disabled={finalIsBlocked}
             />
             <FilterDialog
               parentId={groupId}
-              parentIndex={index}
               disabled={finalIsBlocked}
               handleCreateOrEditFilters={handleCreateOrEditFilters}
               handleParentOpen={onValueChange}

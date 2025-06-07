@@ -26,6 +26,6 @@ export type TFilterParams =
   | {
       action: "CREATE";
       filter: TFilter;
-      parentIndex: number;
+      parentId: string;
     }
-  | { action: "EDIT"; filter: TFilter; index: number };
+  | { action: "EDIT"; filter: TFilter };

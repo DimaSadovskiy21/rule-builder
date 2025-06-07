@@ -23,19 +23,17 @@ type Props = {
   filter: TFilter;
   index: number;
   childPosition: number;
-  parentIndex: number;
   isParentBlocked: boolean;
   displayIndex: string;
   siblingCount: number;
   isLast: boolean;
   handleCreateOrEditFilters: (params: TFilterParams) => void;
-  moveGroup: (fromIndex: number, toIndex: number, parentIndex?: number) => void;
+  moveGroup: (fromIndex: number, toIndex: number, parentId?: string) => void;
 };
 
 const Filter: FC<Props> = (props) => {
   const {
     filter,
-    parentIndex,
     index,
     childPosition,
     isParentBlocked,
@@ -119,7 +117,7 @@ const Filter: FC<Props> = (props) => {
       return;
     }
 
-    moveGroup(Number(draggedIndex), childPosition, parentIndex);
+    moveGroup(Number(draggedIndex), childPosition, parentId);
   };
 
   return (
@@ -191,7 +189,6 @@ const Filter: FC<Props> = (props) => {
           <DropdownMenuContent className="flex flex-col items-center justify-between gap-2">
             <FilterDialog
               parentId={parentId}
-              parentIndex={parentIndex}
               data={filter}
               index={index}
               handleCreateOrEditFilters={handleCreateOrEditFilters}

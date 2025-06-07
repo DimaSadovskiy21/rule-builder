@@ -21,7 +21,6 @@ import { type TFilter, type TFilterParams, ACTION_TYPE } from "@/types/filter";
 
 type Props = {
   parentId: string;
-  parentIndex: number;
   index?: number;
   data?: TFilter;
   disabled?: boolean;
@@ -34,7 +33,6 @@ const FilterDialog: FC<Props> = (props) => {
     parentId,
     data,
     disabled,
-    parentIndex,
     index,
     handleCreateOrEditFilters,
     handleParentOpen,
@@ -65,7 +63,7 @@ const FilterDialog: FC<Props> = (props) => {
         handleCreateOrEditFilters({
           action: ACTION_TYPE.CREATE,
           filter: newFilter,
-          parentIndex,
+          parentId,
         });
 
         toast.success("Filter was created successfully");
@@ -88,7 +86,6 @@ const FilterDialog: FC<Props> = (props) => {
         handleCreateOrEditFilters({
           action: ACTION_TYPE.EDIT,
           filter: updatedFilter,
-          index,
         });
 
         toast.success("Filter was updated successfully");
@@ -106,7 +103,6 @@ const FilterDialog: FC<Props> = (props) => {
       handleParentOpen,
       index,
       parentId,
-      parentIndex,
     ]
   );
 

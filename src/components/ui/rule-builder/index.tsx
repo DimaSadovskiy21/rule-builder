@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 // ui components
@@ -28,16 +28,22 @@ import { type TFilter, type TFilterParams } from "@/types/filter";
 const RuleBuilder = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [groups, setGroups] = useState<TGroup[]>([]);
-  const [filters, setFilters] = useState<TFilter[]>([]);
-
-  console.log(groups);
+  const [groups, setGroups] = useState<Map<string, TGroup>>(new Map());
+  const [filters, setFilters] = useState<Map<string, TFilter>>(new Map());
+  const [topLevelGroupIds, setTopLevelGroupIds] = useState<string[]>([]);
 
   const handleCreateOrEditGroups = useCallback((params: TGroupParams) => {
     const { action, group } = params;
 
     if (action === ACTION_TYPE.CREATE) {
-      setGroups((prev) => [...prev, group]);
+      setGroups((prev) => {
+        const newGroups = new Map(prev);
+        newGroups.set(group.groupId, group);
+
+        return newGroups;
+      });
+
+      setTopLevelGroupIds((prev) => [...prev, group.groupId]);
 
       setTimeout(
         () =>
@@ -53,9 +59,10 @@ const RuleBuilder = () => {
 
     if (action === ACTION_TYPE.EDIT) {
       setGroups((prev) => {
-        const newGroups = [...prev];
-        newGroups[params.index] = group;
+        if (!prev.has(group.groupId)) return prev;
 
+        const newGroups = new Map(prev);
+        newGroups.set(group.groupId, group);
         return newGroups;
       });
 
@@ -64,26 +71,23 @@ const RuleBuilder = () => {
 
     if (action === ACTION_TYPE.SUB_CREATE) {
       setGroups((prev) => {
-        const newGroups = [...prev];
-        const newSubgroupIndex: TChild = {
-          type: CHILD_TYPE.GROUP,
-          index: newGroups.length,
-        };
+        const newGroups = new Map(prev);
 
-        newGroups.push(group);
+        newGroups.set(group.groupId, group);
 
-        const parent = newGroups[params.parentIndex];
+        const parent = newGroups.get(params.parentId);
 
-        if (!parent) {
-          return newGroups;
-        }
+        if (!parent) return prev;
 
-        const childrenIndexes = parent.children ?? [];
+        const newChildren: TChild[] = [
+          ...(parent.children ?? []),
+          { type: CHILD_TYPE.GROUP, id: group.groupId },
+        ];
 
-        newGroups[params.parentIndex] = {
+        newGroups.set(params.parentId, {
           ...parent,
-          children: [...childrenIndexes, newSubgroupIndex],
-        };
+          children: newChildren,
+        });
 
         return newGroups;
       });
@@ -96,34 +100,29 @@ const RuleBuilder = () => {
     const { action, filter } = params;
 
     if (action === ACTION_TYPE.CREATE) {
-      let filterLength = 0;
-
       setFilters((prev) => {
-        filterLength = prev.length;
+        const newFilters = new Map(prev);
 
-        return [...prev, filter];
+        newFilters.set(filter.filterId, filter);
+
+        return newFilters;
       });
 
       setGroups((prev) => {
-        const newGroups = [...prev];
+        const newGroups = new Map(prev);
+        const parent = newGroups.get(params.parentId);
 
-        const newFilterIndex: TChild = {
+        if (!parent) return prev;
+
+        const newChild: TChild = {
           type: CHILD_TYPE.FILTER,
-          index: filterLength,
+          id: filter.filterId,
         };
 
-        const parent = newGroups[params.parentIndex];
-
-        if (!parent) {
-          return newGroups;
-        }
-
-        const childrenIndexes = parent.children ?? [];
-
-        newGroups[params.parentIndex] = {
+        newGroups.set(params.parentId, {
           ...parent,
-          children: [...childrenIndexes, newFilterIndex],
-        };
+          children: [...(parent.children ?? []), newChild],
+        });
 
         return newGroups;
       });
@@ -133,9 +132,11 @@ const RuleBuilder = () => {
 
     if (action === ACTION_TYPE.EDIT) {
       setFilters((prev) => {
-        const newFilters = [...prev];
-        newFilters[params.index] = filter;
+        if (!prev.has(filter.filterId)) return prev;
 
+        const newFilters = new Map(prev);
+
+        newFilters.set(filter.filterId, filter);
         return newFilters;
       });
 
@@ -144,69 +145,43 @@ const RuleBuilder = () => {
   }, []);
 
   const moveGroup = useCallback(
-    (fromIndex: number, toIndex: number, parentIndex?: number) => {
-      if (typeof parentIndex === "number") {
-        setGroups((prevGroups) => {
-          const updatedGroups = [...prevGroups];
-          const parentGroup = updatedGroups[parentIndex];
+    (fromIndex: number, toIndex: number, parentId?: string) => {
+      if (parentId) {
+        setGroups((prev) => {
+          const newGroups = new Map(prev);
 
-          if (!parentGroup || !parentGroup.children) {
+          const parent = newGroups.get(parentId);
+
+          if (!parent || !parent.children) {
             toast.error(
               "Invalid child move: parent not found or has no children"
             );
-            return prevGroups;
+            return prev;
           }
 
-          const children = [...parentGroup.children];
-          const [movedChild] = children.splice(fromIndex, 1);
-          children.splice(toIndex, 0, movedChild);
+          const children = [...parent.children];
+          const [moved] = children.splice(fromIndex, 1);
+          children.splice(toIndex, 0, moved);
 
-          updatedGroups[parentIndex] = {
-            ...parentGroup,
+          newGroups.set(parentId, {
+            ...parent,
             children,
-          };
+          });
 
-          return updatedGroups;
+          return newGroups;
         });
 
         return;
       }
 
-      setGroups((prevGroups) => {
-        const updatedGroups = [...prevGroups];
-
-        const fromGroup = updatedGroups[fromIndex];
-        const toGroup = updatedGroups[toIndex];
-
-        if (!fromGroup || !toGroup) {
-          toast.error("Invalid move: group not found");
-          return prevGroups;
-        }
-
-        if ((fromGroup.parentId ?? null) !== (toGroup.parentId ?? null)) {
-          toast.error("You can only reorder groups within the same parent");
-          return prevGroups;
-        }
-
-        const [movedGroup] = updatedGroups.splice(fromIndex, 1);
-        updatedGroups.splice(toIndex, 0, movedGroup);
-
-        return updatedGroups;
+      setTopLevelGroupIds((prevIds) => {
+        const updated = [...prevIds];
+        const [moved] = updated.splice(fromIndex, 1);
+        updated.splice(toIndex, 0, moved);
+        return updated;
       });
     },
     []
-  );
-
-  const parentGroupsLength = useMemo(
-    () =>
-      groups.reduce((acc, value) => {
-        if (value.parentId) return acc;
-
-        acc += 1;
-
-        return acc;
-      }, 0),
-    [groups]
   );
 
   return (
@@ -218,13 +193,9 @@ const RuleBuilder = () => {
         </CardAction>
       </CardHeader>
       <CardContent className="overflow-hidden flex items-center w-full h-full justify-center">
-        {!groups.length ? (
+        {!topLevelGroupIds.length ? (
           <div className="flex flex-col items-center gap-6">
-            <img
-              src="norules_image.webp"
-              alt="no rules"
-              className="w-[40%]"
-            />
+            <img src="norules_image.webp" alt="no rules" className="w-[40%]" />
             <div className="flex flex-col gap-1 items-center">
               <h4 className="scroll-m-20 text-xl font-semibold tracking-tight">
                 No rules yet
@@ -239,14 +210,14 @@ const RuleBuilder = () => {
             ref={containerRef}
             className="w-full h-full flex flex-col gap-4 overflow-y-auto overflow-x-hidden scrollbar-custom p-2"
           >
-            {groups.reduce<React.ReactNode[]>((acc, group, index) => {
-              if (group.parentId) return acc;
+            {topLevelGroupIds.map((groupid, index) => {
+              const group = groups.get(groupid);
+              if (!group) return null;
 
               const renderChildren =
                 (
                   children: TChild[],
-                  prefix: string,
-                  parentIndex: number
+                  prefix: string
                 ): ((
                   isParentBlocked: boolean,
                   isParentPaused: boolean
@@ -254,18 +225,17 @@ const RuleBuilder = () => {
                 (isParentBlocked, isParentPaused) =>
                   children.map((child, childPosition, array) => {
                     const isLast = childPosition === array.length - 1;
+                    const displayIndex = `${prefix}.${childPosition + 1}`;
 
                     if (child.type === CHILD_TYPE.GROUP) {
-                      const childGroup = groups[child.index];
-                      const displayIndex = `${prefix}.${childPosition + 1}`;
+                      const childGroup = groups.get(child.id);
+                      if (!childGroup) return null;
 
                       return (
                         <Group
                           key={childGroup.groupId}
                           group={childGroup}
-                          index={child.index}
-                          parentIndex={parentIndex}
-                          childPosition={childPosition}
+                          index={childPosition}
                           siblingCount={array.length}
                           isParentBlocked={isParentBlocked}
                           isParentPaused={isParentPaused}
@@ -278,8 +248,7 @@ const RuleBuilder = () => {
                             childGroup.children?.length
                               ? renderChildren(
                                   childGroup.children,
-                                  displayIndex,
-                                  child.index
+                                  displayIndex
                                 )
                               : undefined
                           }
@@ -288,15 +257,14 @@ const RuleBuilder = () => {
                     }
 
                     if (child.type === CHILD_TYPE.FILTER) {
-                      const filter = filters[child.index];
-                      const displayIndex = `${prefix}.${childPosition + 1}`;
+                      const filter = filters.get(child.id);
+                      if (!filter) return null;
 
                       return (
                         <Filter
                           key={filter.filterId}
                           filter={filter}
-                          index={child.index}
-                          parentIndex={parentIndex}
+                          index={childPosition}
                           childPosition={childPosition}
                           siblingCount={array.length}
                           isLast={isLast}
@@ -309,15 +277,15 @@ const RuleBuilder = () => {
                     }
                   });
 
-              const displayIndex = `${acc.length + 1}`;
-              const isLast = acc.length + 1 === parentGroupsLength;
+              const displayIndex = `${index + 1}`;
+              const isLast = index + 1 === topLevelGroupIds.length;
 
-              acc.push(
+              return (
                 <Group
                   key={group.groupId}
                   group={group}
                   index={index}
-                  siblingCount={parentGroupsLength}
+                  siblingCount={topLevelGroupIds.length}
                   displayIndex={displayIndex}
                   handleCreateOrEditGroups={handleCreateOrEditGroups}
                   handleCreateOrEditFilters={handleCreateOrEditFilters}
@@ -325,14 +293,12 @@ const RuleBuilder = () => {
                   isLast={isLast}
                   childrenElements={
                     group.children?.length
-                      ? renderChildren(group.children, displayIndex, index)
+                      ? renderChildren(group.children, displayIndex)
                       : undefined
                   }
                 />
               );
-
-              return acc;
-            }, [])}
+            })}
           </div>
         )}
       </CardContent>
